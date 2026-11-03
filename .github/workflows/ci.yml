@@ -1,0 +1,49 @@
+# Runs on every push / pull request: frontend unit tests, backend tests, and Selenium E2E.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Frontend tests and build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Unit and API tests
+        working-directory: backend
+        run: pytest recruiting/tests -q
+
+      # GitHub's Ubuntu runners ship with Chrome; Selenium Manager fetches the matching driver.
+      - name: Selenium end-to-end tests
+        working-directory: backend
+        run: pytest -m e2e -q
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-screenshots
+          path: backend/e2e/screenshots/

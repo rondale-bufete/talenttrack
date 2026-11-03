@@ -1,0 +1,55 @@
+# Cloud Build pipeline: test -> build image -> push to Artifact Registry -> deploy to Cloud Run
+# Run manually:  gcloud builds submit --config cloudbuild.yaml
+# Or connect a Cloud Build trigger to your GitHub repo so every push to main deploys.
+substitutions:
+  _REGION: asia-southeast1
+  _REPO: talenttrack
+  _SERVICE: talenttrack
+  _SQL_INSTANCE: ${PROJECT_ID}:asia-southeast1:talenttrack-db
+
+steps:
+  - id: unit-tests
+    name: python:3.13-slim
+    dir: backend
+    entrypoint: bash
+    args: ["-c", "pip install -q -r requirements.txt && pytest recruiting/tests -q"]
+
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/app:$SHORT_SHA", "."]
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args: ["push", "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/app:$SHORT_SHA"]
+
+  - id: migrate
+    # Runs `manage.py migrate` as a one-off Cloud Run job using the new image
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        gcloud run jobs deploy talenttrack-migrate \
+          --image ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/app:$SHORT_SHA \
+          --region ${_REGION} --set-cloudsql-instances ${_SQL_INSTANCE} \
+          --set-env-vars DB_NAME=talenttrack,DB_USER=talenttrack,DB_HOST=/cloudsql/${_SQL_INSTANCE} \
+          --set-secrets DB_PASSWORD=db-password:latest,DJANGO_SECRET_KEY=django-secret-key:latest \
+          --command python --args manage.py,migrate,--noinput \
+          --execute-now --wait
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/app:$SHORT_SHA
+      - --region=${_REGION}
+      - --allow-unauthenticated
+      - --add-cloudsql-instances=${_SQL_INSTANCE}
+      - --set-env-vars=DB_NAME=talenttrack,DB_USER=talenttrack,DB_HOST=/cloudsql/${_SQL_INSTANCE},DJANGO_ALLOWED_HOSTS=.run.app
+      - --set-secrets=DB_PASSWORD=db-password:latest,DJANGO_SECRET_KEY=django-secret-key:latest
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/app:$SHORT_SHA
