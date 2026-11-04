@@ -1,0 +1,6 @@
+# Shell scripts and Docker files must keep Linux (LF) line endings, even when cloned
+# on Windows. A CRLF start.sh fails inside the container with "not found".
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf

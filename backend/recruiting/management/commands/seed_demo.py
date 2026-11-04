@@ -19,9 +19,13 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--candidates", type=int, default=40)
         parser.add_argument("--reset", action="store_true", help="Delete existing data first")
+        parser.add_argument("--if-empty", action="store_true", help="Only seed when there are no jobs")
 
     @transaction.atomic
     def handle(self, *args, **opts):
+        if opts["if_empty"] and Job.objects.exists():
+            self.stdout.write("Data already present; skipping seed.")
+            return
         if opts["reset"]:
             Application.objects.all().delete()
             Candidate.objects.all().delete()

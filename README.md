@@ -50,6 +50,29 @@ talenttrack/
     └── GCP_DEPLOY.md           step-by-step Google Cloud deployment
 ```
 
+## Run with Docker (easiest)
+
+Requirements: [Docker Desktop](https://www.docker.com/products/docker-desktop/). Nothing else.
+
+```bash
+git clone https://github.com/YOUR_USERNAME/talenttrack.git
+cd talenttrack
+docker compose up --build
+```
+
+Open http://localhost:8000. This starts PostgreSQL plus the app (gunicorn serving the
+API and the built React app), runs migrations and loads demo data. Stop with `Ctrl+C`.
+
+| Command | What it does |
+|---|---|
+| `docker compose up --build` | App + Postgres at http://localhost:8000 |
+| `docker compose run --rm tests` | All backend tests + Selenium in headless Chromium |
+| `docker compose --profile dev up backend-dev frontend-dev` | Live reload: edit code, see changes at http://localhost:5173 |
+| `docker compose down` | Stop everything (keeps the database) |
+| `docker compose down -v` | Stop and delete the database |
+
+No `.env` file is needed. To change passwords or ports, copy `.env.example` to `.env`.
+
 ## Run it locally
 
 Requirements: Python 3.11+, Node 20+, Google Chrome (for Selenium).

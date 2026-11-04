@@ -36,6 +36,8 @@ def browser(_require_frontend_build):
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--window-size=1400,900")
+    if os.environ.get("CHROME_BINARY"):          # e.g. Chromium in the Docker test image
+        opts.binary_location = os.environ["CHROME_BINARY"]
     # Normally Selenium Manager downloads the right chromedriver automatically.
     # CHROMEDRIVER_PATH lets CI (or an offline machine) point at a specific driver.
     service = None

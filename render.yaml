@@ -1,0 +1,18 @@
+# Render Blueprint: free web service built from the Dockerfile.
+# In Render: New + -> Blueprint -> pick this GitHub repo -> Apply.
+services:
+  - type: web
+    name: talenttrack
+    runtime: docker
+    plan: free
+    region: singapore
+    healthCheckPath: /api/health/
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_ALLOWED_HOSTS
+        value: .onrender.com
+      - key: DJANGO_CSRF_TRUSTED_ORIGINS
+        value: https://*.onrender.com
+      - key: SEED_DEMO
+        value: "true"

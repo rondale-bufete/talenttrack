@@ -1,0 +1,93 @@
+# Docker setup. After `git clone`:
+#
+#   docker compose up --build                 -> app + Postgres at http://localhost:8000
+#   docker compose run --rm tests             -> full pytest + Selenium suite (headless Chromium)
+#   docker compose --profile dev up backend-dev frontend-dev
+#                                             -> live-reload dev setup at http://localhost:5173
+#
+# Every value has a default, so no .env file is needed. To override, copy .env.example to .env.
+
+x-db-env: &db-env
+  DB_NAME: ${POSTGRES_DB:-talenttrack}
+  DB_USER: ${POSTGRES_USER:-talenttrack}
+  DB_PASSWORD: ${POSTGRES_PASSWORD:-talenttrack}
+  DB_HOST: db
+  DB_PORT: "5432"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-talenttrack}
+      POSTGRES_USER: ${POSTGRES_USER:-talenttrack}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-talenttrack}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Production-like: gunicorn serving the API and the built React app
+  web:
+    build:
+      context: .
+      target: prod
+    ports:
+      - "${WEB_PORT:-8000}:8080"
+    environment:
+      <<: *db-env
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-local-docker-secret-change-me}
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      SEED_DEMO: ${SEED_DEMO:-true}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Test runner. Uses SQLite inside the container (same as CI), so it needs no database service.
+  tests:
+    build:
+      context: .
+      target: test
+    profiles: ["test"]
+    volumes:
+      - ./backend/e2e/screenshots:/app/backend/e2e/screenshots   # failure screenshots appear on your PC
+
+  # ---------- dev profile: edit code on your PC, see changes instantly ----------
+  backend-dev:
+    build:
+      context: .
+      target: base
+    profiles: ["dev"]
+    command: sh -c "python manage.py migrate && python manage.py seed_demo --if-empty && python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "8001:8000"          # browsable API at http://localhost:8001/api/
+    environment:
+      <<: *db-env
+      DJANGO_DEBUG: "true"
+      DJANGO_ALLOWED_HOSTS: "*"
+    volumes:
+      - ./backend:/app/backend
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend-dev:
+    image: node:22-slim
+    profiles: ["dev"]
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_TARGET: http://backend-dev:8000
+      VITE_USE_POLLING: "true"   # file watching through Windows/macOS bind mounts
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules          # keep Linux node_modules inside the container
+    depends_on:
+      - backend-dev
+
+volumes:
+  pgdata:
