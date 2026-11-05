@@ -132,16 +132,3 @@ python manage.py screen_benchmark
 | GET | `/api/stats/` | dashboard counts |
 | GET | `/api/health/` | health check for Cloud Run |
 
-DRF also gives a clickable browsable API at http://127.0.0.1:8000/api/.
-
-## Deploy to Google Cloud
-
-See [docs/GCP_DEPLOY.md](docs/GCP_DEPLOY.md).
-
-## What I'd add next
-
-- Authentication (DRF token/JWT) and per-recruiter permissions
-- Résumé uploads to Cloud Storage
-- Move screening to a background queue (Cloud Tasks / Celery) so large batches don't hold an HTTP request open
-- Allure or pytest-html reports and QA metrics (pass rate, flaky tests) in CI
-# talenttrack
